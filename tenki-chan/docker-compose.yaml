@@ -1,0 +1,9 @@
+version: '3.9'
+services:
+  tenkichan:
+    # restart: always
+    build: .
+    environment:
+      TOKEN: ${TOKEN}
+      CHANNEL_ID: ${CHANNEL_ID}
+      WEATHER_APIURL: https://weather.tsukumijima.net/api/forecast/city/140010
