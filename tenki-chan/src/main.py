@@ -65,7 +65,6 @@ def getWeather():
 async def main():
     global today
     weathers = ["晴れ", "くもっ", "雨だっ"]
-    oldSeed = 0
     dt = datetime.today()
     print(f"today: {dt}")
     print("sub thread start")
@@ -76,12 +75,11 @@ async def main():
         weather = getWeather()
         print(f"Wait next: {str(waitTime)}min({str(round(waitTime / 60, 3))}h)...")
         await bot.change_presence(status=discord.Status.idle)
-        time.sleep(waitTime * 60)
-
+        onlinetime = (random.random() + 1) * 5
+        time.sleep(waitTime * 60 - onlinetime)
         await bot.change_presence(status=discord.Status.online)
-        seed = random.random() * 20
-        waitTime = 24 * 60 - oldSeed
-        oldSeed = seed
+        ## 24時間後に投稿
+        waitTime = 24 * 60
         tenkichanStatus = [weather.get("今日")] + comment()
         await channel.send(
             "今日は"
@@ -95,7 +93,7 @@ async def main():
             + "たらいいな..."
         )
         print(f"Status: {str(tenkichanStatus)}")
-        time.sleep(seed)
+        time.sleep(onlinetime)
 
 
 @bot.event
