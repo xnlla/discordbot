@@ -24,10 +24,12 @@ cd tenki-chan
 
 `.env`ファイルを作成してください。`CHANNEL_ID`は、botがアクセス可能なチャンネル ID を指定してください。
 また、botが使用するため、ユーザはこれに書き込みを行わないでください。
+`WEATHER_APIURL`はdocker-compose.yamlへ設定されているため、.evnでの設定は不要です。
 
 ```env
 TOKEN=XXXXXXXXXXXXXXX
 CHANNEL_ID=YYYYYYYYYYYYYYY
+## WEATHER_APIURL=https://weather.tsukumijima.net/api/forecast/city/140010
 ```
 
 コンテナを起動します。

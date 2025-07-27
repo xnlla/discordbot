@@ -16,7 +16,7 @@ channelId = int(os.environ["CHANNEL_ID"])
 
 weatherApiUrl = os.environ["WEATHER_APIURL"]
 
-postHour = 21
+postHour = 20
 
 kanjo = [
     "かなしかった",
@@ -74,8 +74,7 @@ async def main():
     dt = datetime.today()
     print(f"today: {dt}")
     print("sub thread start")
-    diffTime = (postHour * 60 - (dt.hour * 60 + dt.minute)) * 60
-    waitTime = diffTime if diffTime >= 0 else 24 * 60 * 60 + diffTime
+
     channel = bot.get_channel(channelId)
 
     ## 再起動時に表示
@@ -83,17 +82,25 @@ async def main():
     print("Awaike message send: " + awakeMessage)
     await channel.send(awakeMessage)
 
+    ## 間隔
+    onlinetime = 60 * 5
+    interval = 24 * 60 * 60 - onlinetime
+
+    diffTime = (postHour * 60 - (dt.hour * 60 + dt.minute)) * 60
+    # diffTime = 1 ## debug
+    waitTime = diffTime if diffTime >= 0 else interval + diffTime
+
     while True:
         weather = getWeather()
         print(
             f"Wait next: {str(waitTime / 60)}min({str(round(waitTime / 60 / 60, 3))}h)..."
         )
         await bot.change_presence(status=discord.Status.idle)
-        onlinetime = 5 * 60
-        time.sleep(waitTime - onlinetime)
+
+        time.sleep(max(waitTime - onlinetime, 0))
         await bot.change_presence(status=discord.Status.online)
         ## 24時間後に投稿
-        waitTime = 24 * 60 * 60
+        waitTime = interval
         tenkichanStatus = [weather.get("今日")] + comment()
         await channel.send(
             "今日は"
@@ -107,7 +114,7 @@ async def main():
             + "たらいいな..."
         )
         print(f"Status: {str(tenkichanStatus)}")
-        time.sleep(onlinetime)
+        time.sleep(max(onlinetime, 0))
 
 
 @bot.event
