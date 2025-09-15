@@ -59,12 +59,10 @@ async def kaikei(ctx: discord.ApplicationContext):
     ## チャンネルメッセージ履歴を購読
     async for message in channel.history(limit=500):
         print("Read line:" + message.content)
-        [
-            loanBorrow,
-            entry,
-            _,
-        ] = message.content.split(" ")
-
+        Line = message.content.split(" ")
+        loanBorrow = Line[0]
+        entry = Line[1]
+        
         if loanBorrow == "貸":
             result += int(entry)
         elif loanBorrow == "借":
