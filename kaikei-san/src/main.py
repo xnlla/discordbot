@@ -16,6 +16,7 @@ DB_PATH = os.environ.get("DB_PATH", "/workspace/data/kaikei.db")
 GUILD_ID = os.environ.get("GUILD_ID")
 DEBUG_GUILDS = [int(GUILD_ID)] if GUILD_ID else None
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+CHANNEL_ID = os.environ.get("CHANNEL_ID")
 
 logging.basicConfig(level=LOG_LEVEL, format="%(levelname)s %(message)s")
 logger = logging.getLogger("kaikei_san")
@@ -29,9 +30,31 @@ bot = discord.Bot(
 connection = db.connect(DB_PATH)
 
 
+async def notify_channel(message: str) -> None:
+    if CHANNEL_ID is None:
+        return
+    channel = bot.get_channel(int(CHANNEL_ID))
+    if channel is None:
+        logger.warning("通知チャンネルが見つかりません channel_id=%s", CHANNEL_ID)
+        return
+    await channel.send(message)
+
+
+_original_close = bot.close
+
+
+async def _close_with_notice():
+    await notify_channel("終了します")
+    await _original_close()
+
+
+bot.close = _close_with_notice
+
+
 @bot.event
 async def on_ready():
     logger.debug("会計さんを起動")
+    await notify_channel("業務開始します")
 
 
 @bot.command(name="lend", description="相手にお金を貸した記録を追加します")

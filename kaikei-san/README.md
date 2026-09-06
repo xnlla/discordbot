@@ -42,9 +42,12 @@ cd kaikei-san
 TOKEN=XXXXXXXXXXXXXXX
 GUILD_ID=XXXXXXXXXXXXXXX
 LOG_LEVEL=INFO
+CHANNEL_ID=XXXXXXXXXXXXXXX
 ```
 
 `GUILD_ID`を指定すると、スラッシュコマンドがそのギルド専用コマンドとして即座に反映されます（グローバルコマンドはDiscord側の反映に最大1時間程度かかるため、動作確認や開発時に有用です）。未指定の場合はグローバルコマンドとして登録されます。
+
+`CHANNEL_ID`を指定すると、起動時・終了時メッセージを送信します。
 
 コンテナを起動します。
 
