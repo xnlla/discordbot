@@ -1,101 +1,146 @@
-# Pycordを読み込む
-import discord
-from discord.commands import Option
-import datetime
+"""kaikei-san のエントリポイント。bot初期化・コマンド登録・起動を行う。"""
+
+import io
+import logging
 import os
 
+import discord
+from discord.commands import Option
+
+import db
+import formatting
+import repository
+
 TOKEN = os.environ["TOKEN"]
+DB_PATH = os.environ.get("DB_PATH", "/workspace/data/kaikei.db")
+GUILD_ID = os.environ.get("GUILD_ID")
+DEBUG_GUILDS = [int(GUILD_ID)] if GUILD_ID else None
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
-chouboId = int(os.environ["CHOUBO_ID"])
-
+logging.basicConfig(level=LOG_LEVEL, format="%(levelname)s %(message)s")
+logger = logging.getLogger("kaikei_san")
 
 bot = discord.Bot(
-    intents=discord.Intents.all(),
-    activity=discord.Game("帳簿の集計"),
+    intents=discord.Intents.default(),
+    activity=discord.Game("貸し借りの記録"),
+    debug_guilds=DEBUG_GUILDS,
 )
+
+connection = db.connect(DB_PATH)
 
 
 @bot.event
 async def on_ready():
-    print("会計さんを起動")
+    logger.debug("会計さんを起動")
 
 
-@bot.command(
-    name="shiwake",
-    description="仕訳を帳簿に追加します",
-)
-async def shiwake(
+@bot.command(name="lend", description="相手にお金を貸した記録を追加します")
+async def lend(
     ctx: discord.ApplicationContext,
-    loanborrow: Option(
-        discord.SlashCommandOptionType.string,
-        choices=["貸", "借"],
-        description="仕訳内容（貸 or 借）",
-    ),  # type: ignore
-    entry: Option(discord.SlashCommandOptionType.integer, description="金額"),  # type: ignore
-    details: Option(discord.SlashCommandOptionType.string, description="内訳"),  # type: ignore
+    user: Option(discord.SlashCommandOptionType.user, description="貸した相手"),  # type: ignore
+    amount: Option(discord.SlashCommandOptionType.integer, description="金額"),  # type: ignore
+    memo: Option(discord.SlashCommandOptionType.string, description="名目"),  # type: ignore
 ):  # type: ignore
-    channel = bot.get_channel(chouboId)
-    ## 帳簿追加内容
-    result = f"{loanborrow} {entry} {details}"
-    print("帳簿追加: " + result)
-    await channel.send(result)
+    logger.info(
+        "command=lend guild_id=%s user_id=%s target_user_id=%s amount=%s",
+        ctx.guild_id,
+        ctx.author.id,
+        user.id,
+        amount,
+    )
+    try:
+        repository.add_lend(
+            connection,
+            guild_id=ctx.guild_id,
+            lender_id=ctx.author.id,
+            borrower_id=user.id,
+            amount=amount,
+            memo=memo,
+        )
+    except repository.InvalidTransactionError as error:
+        await ctx.respond(f"記録できませんでした: {error}")
+        return
     await ctx.respond(
-        f"帳簿に追加しました 仕訳「{loanborrow}」 金額「{format(entry, ',')}円」 名目「{details}」"
+        formatting.format_lend_confirmation(borrower_id=user.id, amount=amount, memo=memo)
     )
 
 
-@bot.command(name="kaikei", description="帳簿を会計します")
-async def kaikei(ctx: discord.ApplicationContext):
-    print("---会計コマンドを実行---")
-
-    ## 帳簿チャンネル
-    channel = bot.get_channel(chouboId)
-
-    ## 帳簿件数
-    count = 0
-    ## 会計
-    result = 0
-
-    ## チャンネルメッセージ履歴を購読
-    async for message in channel.history(limit=500):
-        print("Read line:" + message.content)
-        Line = message.content.split(" ")
-        loanBorrow = Line[0]
-        entry = Line[1]
-        
-        if loanBorrow == "貸":
-            result += int(entry)
-        elif loanBorrow == "借":
-            result -= int(entry)
-        elif loanBorrow == "総":
-            result += int(entry)
-            print("以降は会計済み")
-            break
-        count += 1
-
-    print(f"検索件数: {str(count + 1)}件")
-    ## 結果メッセージ
-    response = "帳簿計算したところ、"
-    summary = ""
-    if result != 0:
-        response += format(abs(result), ",") + " 円"
-        if result < 0:
-            response += "貸していました"
-        else:
-            response += "借りていました"
-        summary += (
-            "総 "
-            + str(abs(result))
-            + " "
-            + datetime.datetime.now().strftime("%Y/%m/%dまでの集計")
+@bot.command(name="borrow", description="相手からお金を借りた記録を追加します")
+async def borrow(
+    ctx: discord.ApplicationContext,
+    user: Option(discord.SlashCommandOptionType.user, description="借りた相手"),  # type: ignore
+    amount: Option(discord.SlashCommandOptionType.integer, description="金額"),  # type: ignore
+    memo: Option(discord.SlashCommandOptionType.string, description="名目"),  # type: ignore
+):  # type: ignore
+    logger.info(
+        "command=borrow guild_id=%s user_id=%s target_user_id=%s amount=%s",
+        ctx.guild_id,
+        ctx.author.id,
+        user.id,
+        amount,
+    )
+    try:
+        repository.add_borrow(
+            connection,
+            guild_id=ctx.guild_id,
+            borrower_id=ctx.author.id,
+            lender_id=user.id,
+            amount=amount,
+            memo=memo,
         )
-        ## 総計エントリ以外が存在する場合は総計エントリを追加
-        if count != 0:
-            await channel.send(summary)
+    except repository.InvalidTransactionError as error:
+        await ctx.respond(f"記録できませんでした: {error}")
+        return
+    await ctx.respond(
+        formatting.format_borrow_confirmation(lender_id=user.id, amount=amount, memo=memo)
+    )
+
+
+@bot.command(name="kaikei", description="あなたの貸し借りサマリーを表示します")
+async def kaikei(ctx: discord.ApplicationContext):
+    logger.info("command=kaikei guild_id=%s user_id=%s", ctx.guild_id, ctx.author.id)
+    entries = repository.get_summary(connection, guild_id=ctx.guild_id, user_id=ctx.author.id)
+    await ctx.respond(formatting.format_summary(entries))
+
+
+@bot.command(name="history", description="あなたが関与した貸し借り記録をファイルで出力します")
+async def history(
+    ctx: discord.ApplicationContext,
+    month: Option(
+        discord.SlashCommandOptionType.string,
+        description="対象年月（省略時は直近30日、all で全件）",
+        choices=formatting.build_month_choices(),
+        required=False,
+        default=None,
+    ),  # type: ignore
+):  # type: ignore
+    logger.info(
+        "command=history guild_id=%s user_id=%s month=%s", ctx.guild_id, ctx.author.id, month
+    )
+
+    if month is None:
+        start_at, end_at = repository.recent_range_utc()
+    elif month == formatting.MONTH_ALL:
+        start_at, end_at = None, None
     else:
-        response += "差し引き 0円でした"
-    print("終了 ---------------")
-    await ctx.respond(response)
+        year, mon = (int(part) for part in month.split("-"))
+        start_at, end_at = repository.month_range_utc(year, mon)
+
+    transactions = repository.get_user_history(
+        connection,
+        guild_id=ctx.guild_id,
+        user_id=ctx.author.id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+    if not transactions:
+        await ctx.respond("記録がありません")
+        return
+
+    content = formatting.format_history_file(transactions, user_id=ctx.author.id)
+    file = discord.File(io.BytesIO(content.encode("utf-8")), filename="kaikei_history.txt")
+    await ctx.respond("貸し借り記録を添付しました", file=file)
 
 
-bot.run(TOKEN)
+if __name__ == "__main__":
+    bot.run(TOKEN)

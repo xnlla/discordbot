@@ -5,4 +5,10 @@ services:
     build: .
     environment:
       TOKEN: ${TOKEN}
-      CHOUBO_ID: ${CHOUBO_ID}
+      GUILD_ID: ${GUILD_ID}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - kaikeisan-data:/workspace/data
+
+volumes:
+  kaikeisan-data:

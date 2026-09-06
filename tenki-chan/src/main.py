@@ -1,13 +1,14 @@
 # Pycordを読み込む
-import discord
-from datetime import datetime
-import time
-import os
 import asyncio
-import random
 import json
-import requests
+import os
+import random
+import time
+from datetime import datetime
 from enum import Enum
+
+import discord
+import requests
 
 TOKEN = os.environ["TOKEN"]
 
@@ -93,7 +94,7 @@ async def main():
     while True:
         weather = getWeather()
         print(
-            f"Wait next: {str(waitTime / 60)}min({str(round(waitTime / 60 / 60, 3))}h)..."
+            f"Wait next: {waitTime / 60!s}min({round(waitTime / 60 / 60, 3)!s}h)..."
         )
         await bot.change_presence(status=discord.Status.idle)
 
@@ -113,7 +114,7 @@ async def main():
             + weathers[round(random.random() * (len(weathers) - 1))]
             + "たらいいな..."
         )
-        print(f"Status: {str(tenkichanStatus)}")
+        print(f"Status: {tenkichanStatus!s}")
         time.sleep(max(onlinetime, 0))
 
 
